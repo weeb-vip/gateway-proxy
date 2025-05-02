@@ -1,0 +1,45 @@
+version: "3"
+services:
+  echo:
+    image: mendhak/http-https-echo:23
+    ports:
+      - "8080:8080"
+  postgres:
+    image: postgres:11-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=mysecretpassword
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=smokey
+  key_management_service:
+    image: fossapps/key-management-service
+    ports:
+      - '5000:5000'
+    environment:
+      - DatabaseConfig__Host=postgres
+      - DatabaseConfig__Port=5432
+      - DatabaseConfig__Database=smokey
+      - ASPNETCORE_URLS=http://+:5000
+      - DatabaseConfig__MigrationTableName=__migrations_key_management
+      - DatabaseConfig__Password=mysecretpassword
+      - DatabaseConfig__User=postgres
+    depends_on:
+      - postgres
+  key_management_service_migration:
+    image: fossapps/key-management-service
+    command:
+      - ./key-management-service
+      - db
+      - migrate
+    environment:
+      - DatabaseConfig__Host=postgres
+      - DatabaseConfig__Port=5432
+      - DatabaseConfig__Database=smokey
+      - ASPNETCORE_URLS=http://+:5000
+      - DatabaseConfig__MigrationTableName=__migrations_key_management
+      - DatabaseConfig__Password=mysecretpassword
+      - DatabaseConfig__User=postgres
+    depends_on:
+      - postgres
+      - key_management_service

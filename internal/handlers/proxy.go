@@ -6,7 +6,6 @@ import (
 	"github.com/weeb-vip/gateway-proxy/internal/jwt"
 	"net/http"
 	"net/http/httputil"
-	"strings"
 )
 
 func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProxy {
@@ -29,11 +28,15 @@ func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProx
 }
 
 func addJWTData(request *http.Request, parser jwt.Parser) {
-	authorizationHeader := request.Header.Get("Authorization")
-	if authorizationHeader == "" || !strings.HasPrefix(authorizationHeader, "Bearer ") {
+	accessTokenCookie, err := request.Cookie("access_token")
+	if err != nil {
 		return
 	}
-	info, err := parser.Parse(authorizationHeader[len("Bearer "):])
+	token := accessTokenCookie.Value
+	if token == "" {
+		return
+	}
+	info, err := parser.Parse(token)
 	if err != nil {
 		return
 	}
@@ -43,7 +46,7 @@ func addJWTData(request *http.Request, parser jwt.Parser) {
 	if info.Purpose != nil {
 		request.Header.Set("x-token-purpose", *info.Purpose)
 	}
-	request.Header.Add("x-raw-token", authorizationHeader[len("Bearer "):])
+	request.Header.Add("x-raw-token", token)
 }
 
 func addRemoteIP(request *http.Request) {

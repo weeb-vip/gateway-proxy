@@ -6,6 +6,7 @@ import (
 	"github.com/weeb-vip/gateway-proxy/config"
 	"github.com/weeb-vip/gateway-proxy/internal/handlers"
 	"github.com/weeb-vip/gateway-proxy/internal/jwt"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
@@ -64,7 +65,7 @@ func TestGetProxy(t *testing.T) {
 
 	t.Run("passes correct token into JWT parser and adds correct information to request headers", func(t *testing.T) {
 		request := httptest.NewRequest("GET", "/", nil)
-		request.Header.Add("Authorization", "Bearer 123")
+		request.AddCookie(&http.Cookie{Name: "access_token", Value: "123"})
 		request.Header.Add("user-agent", "my-agent")
 		request.Header.Add("x-forwarded-for", "192.168.1.1")
 		proxyURL, _ := url.Parse("http://localhost:8080")
@@ -76,7 +77,7 @@ func TestGetProxy(t *testing.T) {
 					Purpose:  getPointer("Purpose"),
 				}, nil
 			}
-			panic("authorization token not passed correctly")
+			panic("access token not passed correctly")
 		}}).Director(request)
 
 		assert.Equal(t, "Subject", request.Header.Get("x-user-id"))

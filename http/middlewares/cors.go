@@ -19,30 +19,71 @@ func corsHandler(next http.Handler, cfg *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
-		// Check if origin is allowed
-		if isOriginAllowed(origin, cfg.CORSAllowedOrigins) {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-		}
-
-		if cfg.CORSAllowCredentials {
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		}
-
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
-
-		if cfg.CORSMaxAge > 0 {
-			w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.CORSMaxAge))
-		}
-
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {
+			setCORSHeaders(w, origin, cfg)
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		// Create a response writer that intercepts headers
+		corsWriter := &corsResponseWriter{
+			ResponseWriter: w,
+			origin:         origin,
+			cfg:            cfg,
+		}
+
+		next.ServeHTTP(corsWriter, r)
 	})
+}
+
+type corsResponseWriter struct {
+	http.ResponseWriter
+	origin      string
+	cfg         *config.Config
+	headersSent bool
+}
+
+func (c *corsResponseWriter) WriteHeader(statusCode int) {
+	if !c.headersSent {
+		// Remove any existing CORS headers from backend
+		c.Header().Del("Access-Control-Allow-Origin")
+		c.Header().Del("Access-Control-Allow-Credentials")
+		c.Header().Del("Access-Control-Allow-Methods")
+		c.Header().Del("Access-Control-Allow-Headers")
+		c.Header().Del("Access-Control-Max-Age")
+
+		// Set our CORS headers
+		setCORSHeaders(c.ResponseWriter, c.origin, c.cfg)
+		c.headersSent = true
+	}
+
+	c.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (c *corsResponseWriter) Write(data []byte) (int, error) {
+	if !c.headersSent {
+		c.WriteHeader(http.StatusOK)
+	}
+	return c.ResponseWriter.Write(data)
+}
+
+func setCORSHeaders(w http.ResponseWriter, origin string, cfg *config.Config) {
+	// Check if origin is allowed
+	if isOriginAllowed(origin, cfg.CORSAllowedOrigins) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+	}
+
+	if cfg.CORSAllowCredentials {
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
+
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
+
+	if cfg.CORSMaxAge > 0 {
+		w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.CORSMaxAge))
+	}
 }
 
 func isOriginAllowed(origin string, allowedOrigins []string) bool {

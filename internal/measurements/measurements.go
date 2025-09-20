@@ -1,7 +1,5 @@
 package measurements
 
-import "github.com/DataDog/datadog-go/v5/statsd"
-
 type Measurer interface {
 	// MeasureExecutionTime when deferred will measure and send execution time of that method body
 	MeasureExecutionTime(label string, tags []string) func()
@@ -10,9 +8,20 @@ type Measurer interface {
 }
 
 type measurement struct {
-	statsd statsd.ClientInterface
 }
 
-func NewMeasurementClient(client statsd.ClientInterface) Measurer {
-	return measurement{statsd: client}
+func NewMeasurementClient() Measurer {
+	return measurement{}
+}
+
+func (m measurement) MeasureExecutionTime(label string, tags []string) func() {
+	return func() {} // no-op
+}
+
+func (m measurement) MarkEvent(label string, tags []string) {
+	// no-op
+}
+
+func (m measurement) MarkEventWithCount(label string, count int, tags []string) {
+	// no-op
 }

@@ -14,17 +14,10 @@ import (
 	"github.com/weeb-vip/gateway-proxy/internal/keys"
 	"github.com/weeb-vip/gateway-proxy/internal/poller"
 
-	ddHttp "gopkg.in/DataDog/dd-trace-go.v1/contrib/net/http"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
 func Start(cfg *config.Config, formatter logrus.Formatter) error {
-	_ = profiler.Start(profiler.WithProfileTypes(profiler.CPUProfile, profiler.HeapProfile))
 	logrus.SetFormatter(formatter)
-	http.DefaultTransport = ddHttp.WrapRoundTripper(http.DefaultTransport)
-	tracer.Start(tracer.WithServiceName("proxy"))
-	defer tracer.Stop()
 	jwtParser, err := getJWTParser(cfg)
 	if err != nil {
 		return err
@@ -33,8 +26,8 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 	fmt.Printf("proxy requests to: %s\n", cfg.ProxyURL.Host)
 	fmt.Println(fmt.Sprintf("listening on http://localhost:%d", cfg.Port))
 
-	mux := ddHttp.NewServeMux(ddHttp.WithServiceName("proxy"))
-	mux.Handle("/", middlewares.Measurement(measurements.NewClient())(middlewares.Tracer()(middlewares.Logger()(handlers.GetProxy(cfg, jwtParser)))))
+	mux := http.NewServeMux()
+	mux.Handle("/", middlewares.Measurement(measurements.NewClient())(middlewares.Logger()(handlers.GetProxy(cfg, jwtParser))))
 
 	return http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), mux)
 }

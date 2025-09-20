@@ -27,7 +27,7 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 	fmt.Println(fmt.Sprintf("listening on http://localhost:%d", cfg.Port))
 
 	mux := http.NewServeMux()
-	mux.Handle("/", middlewares.Measurement(measurements.NewClient())(middlewares.Logger()(handlers.GetProxy(cfg, jwtParser))))
+	mux.Handle("/", middlewares.CORS(cfg)(middlewares.Measurement(measurements.NewClient())(middlewares.Logger()(handlers.GetProxy(cfg, jwtParser)))))
 
 	return http.ListenAndServe(fmt.Sprintf(":%d", cfg.Port), mux)
 }

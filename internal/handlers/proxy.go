@@ -6,6 +6,7 @@ import (
 	"github.com/weeb-vip/gateway-proxy/internal/jwt"
 	"net/http"
 	"net/http/httputil"
+	"strings"
 )
 
 func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProxy {
@@ -14,7 +15,7 @@ func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProx
 		request.URL.Host = config.ProxyURL.Host
 		addUserAgentHeader(request, config)
 		addRemoteIP(request)
-		addJWTData(request, jwtParser)
+		addJWTData(request, jwtParser, config.AuthMode)
 		// log all headers
 		for name, headers := range request.Header {
 			for _, h := range headers {
@@ -27,15 +28,42 @@ func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProx
 	}}
 }
 
-func addJWTData(request *http.Request, parser jwt.Parser) {
-	accessTokenCookie, err := request.Cookie("access_token")
-	if err != nil {
-		return
+func addJWTData(request *http.Request, parser jwt.Parser, authMode string) {
+	var token string
+
+	switch authMode {
+	case "cookie":
+		// Only check cookie
+		accessTokenCookie, err := request.Cookie("access_token")
+		if err != nil {
+			return
+		}
+		token = accessTokenCookie.Value
+	case "header":
+		// Only check Authorization header
+		authorizationHeader := request.Header.Get("Authorization")
+		if authorizationHeader != "" && strings.HasPrefix(authorizationHeader, "Bearer ") {
+			token = authorizationHeader[len("Bearer "):]
+		}
+	default: // "both" or any other value defaults to both
+		// First, try to get token from Authorization header
+		authorizationHeader := request.Header.Get("Authorization")
+		if authorizationHeader != "" && strings.HasPrefix(authorizationHeader, "Bearer ") {
+			token = authorizationHeader[len("Bearer "):]
+		} else {
+			// Fallback to cookie if Authorization header is not present
+			accessTokenCookie, err := request.Cookie("access_token")
+			if err != nil {
+				return
+			}
+			token = accessTokenCookie.Value
+		}
 	}
-	token := accessTokenCookie.Value
+
 	if token == "" {
 		return
 	}
+
 	info, err := parser.Parse(token)
 	if err != nil {
 		return

@@ -2,5 +2,6 @@
   "proxy_address": "http://localhost:8080",
   "cors_allowed_origins": ["https://weeb.vip"],
   "cors_allow_credentials": true,
-  "cors_max_age": 86400
+  "cors_max_age": 86400,
+  "auth_mode": "both"
 }

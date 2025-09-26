@@ -108,26 +108,26 @@ func (m *AppMetrics) ErrorMetric(errorType string) {
 
 // CacheMetric records cache hit/miss performance metrics
 func (m *AppMetrics) CacheMetric(duration float64, result string) {
-	labels := metricsLib.DatabaseMetricLabels{
-		Service: m.defaultTags["service"],
-		Table:   "cache_operation",
-		Method:  "lookup",
-		Result:  result,
-		Env:     m.defaultTags["env"],
+	prometheusClient := NewPrometheusInstance()
+	labels := map[string]string{
+		"service": m.defaultTags["service"],
+		"method":  "lookup",
+		"result":  result,
+		"env":     m.defaultTags["env"],
 	}
-	m.metricsImpl.DatabaseMetric(duration, labels)
+	prometheusClient.Histogram("cache_operation_duration_histogram_milliseconds", duration, labels, 1.0)
 }
 
 // CacheCounterMetric records cache hit/miss counters
 func (m *AppMetrics) CacheCounterMetric(result string) {
-	labels := metricsLib.DatabaseMetricLabels{
-		Service: m.defaultTags["service"],
-		Table:   "cache_counter",
-		Method:  "count",
-		Result:  result,
-		Env:     m.defaultTags["env"],
+	prometheusClient := NewPrometheusInstance()
+	labels := map[string]string{
+		"service": m.defaultTags["service"],
+		"method":  "count",
+		"result":  result,
+		"env":     m.defaultTags["env"],
 	}
-	m.metricsImpl.DatabaseMetric(1, labels) // Count as 1ms duration for counter
+	prometheusClient.Histogram("cache_counter_histogram", 1, labels, 1.0)
 }
 
 // WithTags returns a new metrics instance with additional tags

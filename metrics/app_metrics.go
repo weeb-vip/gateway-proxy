@@ -106,6 +106,30 @@ func (m *AppMetrics) ErrorMetric(errorType string) {
 	m.metricsImpl.DatabaseMetric(1, labels) // Count errors as 1ms duration
 }
 
+// CacheMetric records cache hit/miss performance metrics
+func (m *AppMetrics) CacheMetric(duration float64, result string) {
+	labels := metricsLib.DatabaseMetricLabels{
+		Service: m.defaultTags["service"],
+		Table:   "cache_operation",
+		Method:  "lookup",
+		Result:  result,
+		Env:     m.defaultTags["env"],
+	}
+	m.metricsImpl.DatabaseMetric(duration, labels)
+}
+
+// CacheCounterMetric records cache hit/miss counters
+func (m *AppMetrics) CacheCounterMetric(result string) {
+	labels := metricsLib.DatabaseMetricLabels{
+		Service: m.defaultTags["service"],
+		Table:   "cache_counter",
+		Method:  "count",
+		Result:  result,
+		Env:     m.defaultTags["env"],
+	}
+	m.metricsImpl.DatabaseMetric(1, labels) // Count as 1ms duration for counter
+}
+
 // WithTags returns a new metrics instance with additional tags
 func (m *AppMetrics) WithTags(additionalTags map[string]string) *AppMetrics {
 	newTags := make(map[string]string)

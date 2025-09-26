@@ -10,6 +10,10 @@ import (
 	"github.com/weeb-vip/gateway-proxy/config"
 	"github.com/weeb-vip/gateway-proxy/internal/cache"
 	"github.com/weeb-vip/gateway-proxy/internal/logger"
+	"github.com/weeb-vip/gateway-proxy/metrics"
+	"github.com/weeb-vip/gateway-proxy/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type cacheResponseWriter struct {
@@ -37,6 +41,10 @@ func GraphQLCacheMiddleware(cache *cache.GraphQLCache, cfg *config.Config) func(
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log := logger.Get()
+			metricsClient := metrics.GetAppMetrics()
+
+			// Start timing for cache lookup
+			startTime := time.Now()
 
 			// Only cache POST requests (GraphQL mutations/queries)
 			if r.Method != http.MethodPost {
@@ -60,6 +68,7 @@ func GraphQLCacheMiddleware(cache *cache.GraphQLCache, cfg *config.Config) func(
 			// If no user token, don't cache (could be public queries)
 			if userToken == "" {
 				log.Debug().Msg("No user token found, skipping cache")
+				metricsClient.CacheCounterMetric("skip_no_token")
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -78,8 +87,26 @@ func GraphQLCacheMiddleware(cache *cache.GraphQLCache, cfg *config.Config) func(
 			// Generate cache key
 			cacheKey := cache.GenerateKey(userToken, string(bodyBytes))
 
-			// Check if response is cached
+			// Check if response is cached with tracing
+			tracer := tracing.GetTracer(r.Context())
+			ctx, span := tracer.Start(r.Context(), "cache.lookup",
+				trace.WithAttributes(
+					attribute.String("cache.key", cacheKey),
+					attribute.String("cache.operation", "get"),
+				),
+			)
+			defer span.End()
+
 			if entry, found := cache.Get(cacheKey); found {
+				cacheLookupDuration := time.Since(startTime).Seconds()
+				metricsClient.CacheMetric(cacheLookupDuration, "hit")
+				metricsClient.CacheCounterMetric("hit")
+
+				span.SetAttributes(
+					attribute.String("cache.result", "hit"),
+					attribute.String("cache.age", time.Since(entry.Timestamp).String()),
+				)
+
 				log.Debug().
 					Str("cache_key", cacheKey).
 					Msg("Cache hit - serving cached response")
@@ -101,7 +128,14 @@ func GraphQLCacheMiddleware(cache *cache.GraphQLCache, cfg *config.Config) func(
 				return
 			}
 
+			span.SetAttributes(attribute.String("cache.result", "miss"))
+			_ = ctx // Use ctx if needed elsewhere
+
 			// Cache miss - capture response
+			cacheLookupDuration := time.Since(startTime).Seconds()
+			metricsClient.CacheMetric(cacheLookupDuration, "miss")
+			metricsClient.CacheCounterMetric("miss")
+
 			log.Debug().
 				Str("cache_key", cacheKey).
 				Msg("Cache miss - executing request")
@@ -123,11 +157,13 @@ func GraphQLCacheMiddleware(cache *cache.GraphQLCache, cfg *config.Config) func(
 					log.Debug().
 						Str("cache_key", cacheKey).
 						Msg("Request not cacheable (likely mutation)")
+					metricsClient.CacheCounterMetric("skip_mutation")
 					w.Header().Set("X-Cache-Status", "SKIP")
 					return
 				}
 
 				cache.Set(cacheKey, rw.body.Bytes(), rw.headers)
+				metricsClient.CacheCounterMetric("set")
 				log.Debug().
 					Str("cache_key", cacheKey).
 					Msg("Response cached")

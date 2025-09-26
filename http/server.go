@@ -15,6 +15,7 @@ import (
 	"github.com/weeb-vip/gateway-proxy/internal/keys"
 	"github.com/weeb-vip/gateway-proxy/internal/logger"
 	"github.com/weeb-vip/gateway-proxy/internal/poller"
+	"github.com/weeb-vip/gateway-proxy/metrics"
 	"github.com/weeb-vip/gateway-proxy/tracing"
 )
 
@@ -67,6 +68,13 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 	fmt.Println(fmt.Sprintf("listening on http://localhost:%d", cfg.Port))
 
 	mux := http.NewServeMux()
+
+	// Add metrics endpoint for Prometheus scraping
+	_ = metrics.GetAppMetrics() // Initialize metrics
+	if prometheusClient := metrics.NewPrometheusInstance(); prometheusClient != nil {
+		mux.Handle("/metrics", prometheusClient.Handler())
+		log.Info().Msg("Metrics endpoint available at /metrics")
+	}
 
 	// Create cache if enabled
 	var graphqlCache *cache.GraphQLCache

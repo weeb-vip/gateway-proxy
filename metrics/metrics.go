@@ -82,6 +82,23 @@ func initMetrics(prometheusInstance *prometheus.PrometheusClient) {
 	prometheusInstance.CreateHistogramVec("error_count_histogram", "error count", []string{"service", "error_type", "env"}, []float64{
 		1,
 	})
+
+	// Cache operation duration metrics
+	prometheusInstance.CreateHistogramVec("cache_operation_duration_histogram_milliseconds", "cache operation millisecond", []string{"service", "method", "result", "env"}, []float64{
+		1,
+		5,
+		10,
+		25,
+		50,
+		100,
+		250,
+		500,
+	})
+
+	// Cache counter metrics
+	prometheusInstance.CreateHistogramVec("cache_counter_histogram", "cache counter", []string{"service", "method", "result", "env"}, []float64{
+		1,
+	})
 }
 
 func GetCurrentEnv() string {

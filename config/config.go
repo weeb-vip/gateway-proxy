@@ -29,6 +29,9 @@ type Config struct {
 	AuthMode                   string   `env:"CONFIG__AUTH_MODE" default:"both" json:"auth_mode"` // "cookie", "header", or "both"
 	CacheEnabled               bool     `env:"CONFIG__CACHE_ENABLED" default:"true" json:"cache_enabled"`
 	CacheTTLMinutes            int      `env:"CONFIG__CACHE_TTL_MINUTES" default:"5" json:"cache_ttl_minutes"`
+	RedisURL                   string   `env:"CONFIG__REDIS_URL" default:"redis://localhost:6379" json:"redis_url"`
+	RedisPassword              string   `env:"CONFIG__REDIS_PASSWORD" default:"" json:"redis_password"`
+	RedisDB                    int      `env:"CONFIG__REDIS_DB" default:"0" json:"redis_db"`
 	ProxyURL                   *url.URL
 	APPConfig                  APPConfig
 }

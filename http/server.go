@@ -72,10 +72,24 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 	var graphqlCache *cache.GraphQLCache
 	if cfg.CacheEnabled {
 		cacheTTL := time.Duration(cfg.CacheTTLMinutes) * time.Minute
-		graphqlCache = cache.NewGraphQLCache(cacheTTL)
+		var err error
+		graphqlCache, err = cache.NewGraphQLCache(cfg, cacheTTL)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to initialize Redis cache")
+			return fmt.Errorf("failed to initialize Redis cache: %w", err)
+		}
 		log.Info().
 			Dur("ttl", cacheTTL).
-			Msg("GraphQL cache enabled")
+			Msg("GraphQL Redis cache enabled")
+
+		// Setup graceful shutdown for Redis
+		defer func() {
+			if graphqlCache != nil {
+				if closeErr := graphqlCache.Close(); closeErr != nil {
+					log.Error().Err(closeErr).Msg("Error closing Redis connection")
+				}
+			}
+		}()
 	}
 
 	// Build middleware chain

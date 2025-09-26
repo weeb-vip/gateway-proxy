@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/weeb-vip/gateway-proxy/config"
 	"github.com/weeb-vip/gateway-proxy/http/middlewares"
+	"github.com/weeb-vip/gateway-proxy/internal/cache"
 	"github.com/weeb-vip/gateway-proxy/internal/handlers"
 	"github.com/weeb-vip/gateway-proxy/internal/jwt"
 	"github.com/weeb-vip/gateway-proxy/internal/keys"
@@ -66,18 +67,33 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 	fmt.Println(fmt.Sprintf("listening on http://localhost:%d", cfg.Port))
 
 	mux := http.NewServeMux()
-	// Updated middleware chain with new telemetry
-	mux.Handle("/",
-		middlewares.CORS(cfg)(
-			middlewares.Tracer()(
-				middlewares.MetricsMiddleware()(
-					middlewares.Logger()(
-						handlers.GetProxy(cfg, jwtParser),
-					),
-				),
-			),
-		),
-	)
+
+	// Create cache if enabled
+	var graphqlCache *cache.GraphQLCache
+	if cfg.CacheEnabled {
+		cacheTTL := time.Duration(cfg.CacheTTLMinutes) * time.Minute
+		graphqlCache = cache.NewGraphQLCache(cacheTTL)
+		log.Info().
+			Dur("ttl", cacheTTL).
+			Msg("GraphQL cache enabled")
+	}
+
+	// Build middleware chain
+	var handler http.Handler = handlers.GetProxy(cfg, jwtParser)
+
+	// Add middlewares in reverse order (innermost first)
+	handler = middlewares.Logger()(handler)
+	handler = middlewares.MetricsMiddleware()(handler)
+	handler = middlewares.Tracer()(handler)
+
+	// Add cache middleware if enabled
+	if cfg.CacheEnabled && graphqlCache != nil {
+		handler = middlewares.GraphQLCacheMiddleware(graphqlCache, cfg)(handler)
+	}
+
+	handler = middlewares.CORS(cfg)(handler)
+
+	mux.Handle("/", handler)
 
 	// Use traced context for the server (although http.ListenAndServe doesn't directly use it)
 	_ = tracedCtx

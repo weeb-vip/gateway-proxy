@@ -27,6 +27,8 @@ type Config struct {
 	CORSAllowCredentials       bool     `env:"CONFIG__CORS_ALLOW_CREDENTIALS" default:"true" json:"cors_allow_credentials"`
 	CORSMaxAge                 int      `env:"CONFIG__CORS_MAX_AGE" default:"86400" json:"cors_max_age"`
 	AuthMode                   string   `env:"CONFIG__AUTH_MODE" default:"both" json:"auth_mode"` // "cookie", "header", or "both"
+	CacheEnabled               bool     `env:"CONFIG__CACHE_ENABLED" default:"true" json:"cache_enabled"`
+	CacheTTLMinutes            int      `env:"CONFIG__CACHE_TTL_MINUTES" default:"5" json:"cache_ttl_minutes"`
 	ProxyURL                   *url.URL
 	APPConfig                  APPConfig
 }

@@ -1,8 +1,10 @@
 package middlewares
 
 import (
-	"github.com/sirupsen/logrus"
 	"net/http"
+	"time"
+
+	"github.com/weeb-vip/gateway-proxy/internal/logger"
 )
 
 type loggingResponseWriter struct {
@@ -30,8 +32,21 @@ func Logger() func(http.Handler) http.Handler {
 
 func loggingHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		newW := NewLoggingResponseWriter(w)
+
 		next.ServeHTTP(newW, r)
-		logrus.WithField("status_code", newW.statusCode).WithField("url", r.URL.Path).Info("proxying request completed")
+
+		duration := time.Since(start)
+		log := logger.FromCtx(r.Context())
+
+		log.Info().
+			Str("method", r.Method).
+			Str("url", r.URL.Path).
+			Str("remote_addr", r.RemoteAddr).
+			Str("user_agent", r.UserAgent()).
+			Int("status_code", newW.statusCode).
+			Dur("duration", duration).
+			Msg("proxying request completed")
 	})
 }

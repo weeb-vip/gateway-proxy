@@ -2,11 +2,19 @@ package config
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/jinzhu/configor"
 	"net/url"
 	"path"
 	"runtime"
 )
+
+type APPConfig struct {
+	APPName string
+	Version string
+	Env     string
+}
 
 type Config struct {
 	Version                    string   `env:"APP__VERSION" default:"local"`
@@ -20,6 +28,7 @@ type Config struct {
 	CORSMaxAge                 int      `env:"CONFIG__CORS_MAX_AGE" default:"86400" json:"cors_max_age"`
 	AuthMode                   string   `env:"CONFIG__AUTH_MODE" default:"both" json:"auth_mode"` // "cookie", "header", or "both"
 	ProxyURL                   *url.URL
+	APPConfig                  APPConfig
 }
 
 func LoadConfig() (*Config, error) {
@@ -37,7 +46,32 @@ func LoadConfig() (*Config, error) {
 	}
 	config.ProxyURL = u
 
+	// Populate APPConfig from main config fields
+	config.APPConfig = APPConfig{
+		APPName: getEnvOrDefault("APP__NAME", "gateway-proxy"),
+		Version: config.Version,
+		Env:     getEnvOrDefault("APP__ENV", "development"),
+	}
+
 	return &config, nil
+}
+
+// getEnvOrDefault gets an environment variable with a fallback default
+func getEnvOrDefault(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
+}
+
+// LoadConfigOrPanic loads the config and panics on error
+// This is useful for initialization where we can't proceed without config
+func LoadConfigOrPanic() *Config {
+	cfg, err := LoadConfig()
+	if err != nil {
+		panic(fmt.Sprintf("failed to load config: %v", err))
+	}
+	return cfg
 }
 
 func getConfigLocation() string {

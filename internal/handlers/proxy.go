@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/weeb-vip/gateway-proxy/config"
 	"github.com/weeb-vip/gateway-proxy/internal/jwt"
+	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -16,6 +17,7 @@ func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProx
 		addUserAgentHeader(request, config)
 		addRemoteIP(request)
 		addJWTData(request, jwtParser, config.AuthMode)
+		addTraceHeaders(request)
 		// log all headers
 		for name, headers := range request.Header {
 			for _, h := range headers {
@@ -80,6 +82,15 @@ func addJWTData(request *http.Request, parser jwt.Parser, authMode string) {
 func addRemoteIP(request *http.Request) {
 	request.Header.Set("x-remote-ip", request.Header.Get("x-forwarded-for"))
 	request.Header.Del("x-forwarded-for")
+}
+
+func addTraceHeaders(request *http.Request) {
+	// Inject trace context into outgoing request headers
+	propagator := propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	)
+	propagator.Inject(request.Context(), propagation.HeaderCarrier(request.Header))
 }
 
 func addUserAgentHeader(request *http.Request, cfg *config.Config) {

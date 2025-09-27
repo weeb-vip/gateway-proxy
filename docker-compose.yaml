@@ -15,7 +15,7 @@ services:
   key_management_service:
     image: fossapps/key-management-service
     ports:
-      - '5000:5000'
+      - '5001:5000'
     environment:
       - DatabaseConfig__Host=postgres
       - DatabaseConfig__Port=5432

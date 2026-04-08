@@ -7,6 +7,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/cli/
 FROM gcr.io/distroless/static-debian10
 WORKDIR /app
 COPY --from=builder --chown=nonroot:nonroot /app/main .
+COPY --from=builder --chown=nonroot:nonroot /app/config ./config
 ARG VERSION
 ENV APP__VERSION="${VERSION}"
 USER nonroot

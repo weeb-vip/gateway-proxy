@@ -68,6 +68,21 @@ func (c *corsResponseWriter) Write(data []byte) (int, error) {
 	return c.ResponseWriter.Write(data)
 }
 
+// defaultCORSAllowedHeaders is used when CONFIG__CORS_ALLOWED_HEADERS is unset.
+//
+// traceparent and tracestate are the W3C trace context headers. The browser
+// sends them on cross-origin requests once RUM is enabled, and a header the
+// preflight does not allow makes the browser drop the request entirely rather
+// than merely lose the trace, so they have to be listed here.
+var defaultCORSAllowedHeaders = []string{
+	"Accept",
+	"Authorization",
+	"Content-Type",
+	"X-CSRF-Token",
+	"traceparent",
+	"tracestate",
+}
+
 func setCORSHeaders(w http.ResponseWriter, origin string, cfg *config.Config) {
 	// Check if origin is allowed
 	if isOriginAllowed(origin, cfg.CORSAllowedOrigins) {
@@ -79,7 +94,12 @@ func setCORSHeaders(w http.ResponseWriter, origin string, cfg *config.Config) {
 	}
 
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
+
+	allowedHeaders := cfg.CORSAllowedHeaders
+	if len(allowedHeaders) == 0 {
+		allowedHeaders = defaultCORSAllowedHeaders
+	}
+	w.Header().Set("Access-Control-Allow-Headers", strings.Join(allowedHeaders, ", "))
 
 	if cfg.CORSMaxAge > 0 {
 		w.Header().Set("Access-Control-Max-Age", strconv.Itoa(cfg.CORSMaxAge))

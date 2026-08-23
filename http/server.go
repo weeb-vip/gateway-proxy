@@ -76,6 +76,28 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 		log.Info().Msg("Metrics endpoint available at /metrics")
 	}
 
+	// Liveness/readiness endpoint.
+	//
+	// Deliberately answers from this process alone: no proxy call, no router,
+	// no Redis. It reports "this process is up and serving HTTP" and nothing
+	// more, which is the only question a probe should be asking.
+	//
+	// The probes used to request /graphql?query={__typename}, which proxies
+	// through to cosmo-router. That made the router a liveness dependency of
+	// every gateway pod, and because they all share one router they all failed
+	// the same check within the same period -- kubelet then restarted the
+	// entire fleet at once. A slow router became a total outage for every user
+	// rather than degraded responses for some.
+	//
+	// Registered before mux.Handle("/") and unconditionally, unlike /metrics,
+	// which only exists when the Prometheus instance initialises and otherwise
+	// falls through to the proxy handler.
+	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
 	// Create cache if enabled
 	var graphqlCache *cache.GraphQLCache
 	if cfg.CacheEnabled {

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/weeb-vip/gateway-proxy/config"
+	"github.com/weeb-vip/gateway-proxy/internal/handlers"
 )
 
 // CORS creates a CORS middleware with configuration
@@ -18,6 +19,13 @@ func CORS(cfg *config.Config) func(http.Handler) http.Handler {
 func corsHandler(next http.Handler, cfg *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
+		// A GET /graphql with no Origin is a server-side render, and its
+		// answer may be cached by the CDN and served to the site's browsers
+		// later. Give it the site's own allow-origin header so that cached
+		// answer passes CORS; see handlers.EdgeCache.
+		if origin == "" && r.Method == http.MethodGet && r.URL.Path == "/graphql" {
+			origin = handlers.PrimaryOrigin(cfg)
+		}
 
 		// Handle preflight requests
 		if r.Method == "OPTIONS" {

@@ -11,7 +11,7 @@ import (
 )
 
 func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProxy {
-	edge := EdgeCache{TTLSeconds: config.EdgeCacheTTLSeconds, SWRSeconds: config.EdgeCacheSWRSeconds}
+	edge := EdgeCache{TTLSeconds: config.EdgeCacheTTLSeconds, SWRSeconds: config.EdgeCacheSWRSeconds, Origin: PrimaryOrigin(config)}
 	return &httputil.ReverseProxy{ModifyResponse: setCacheControl(edge), Director: func(request *http.Request) {
 		request.URL.Scheme = "http"
 		request.URL.Host = config.ProxyURL.Host
@@ -94,4 +94,13 @@ func addUserAgentHeader(request *http.Request, cfg *config.Config) {
 	request.Header.Set("x-user-agent", request.UserAgent())
 	request.Header.Del("User-Agent")
 	request.Header.Set("User-Agent", fmt.Sprintf("reverse-proxy/%s", cfg.Version))
+}
+
+// PrimaryOrigin is the site's own origin: the first CORS allowed origin,
+// unless that is a wildcard. It is the one origin a shared answer is for.
+func PrimaryOrigin(cfg *config.Config) string {
+	if len(cfg.CORSAllowedOrigins) == 0 || cfg.CORSAllowedOrigins[0] == "*" {
+		return ""
+	}
+	return cfg.CORSAllowedOrigins[0]
 }

@@ -8,10 +8,25 @@ import (
 	"net/http"
 )
 
-// EdgeCache is how long a CDN may hold an anonymous query response.
+// EdgeCache is how long a CDN may hold an anonymous query response, and
+// the one browser origin such an answer is for.
+//
+// A CDN keys on the URL, not on the Origin header, so a shared answer can
+// carry exactly one Access-Control-Allow-Origin. That is the site's own
+// origin (the first CORS allowed origin): a request from it, or from no
+// origin at all (a server-side render), may be shared; a request from any
+// other origin (the admin panel, a local dev server) is answered fresh and
+// marked private, with the CORS header it asked for.
 type EdgeCache struct {
 	TTLSeconds int
 	SWRSeconds int
+	Origin     string
+}
+
+// Shareable reports whether a request's Origin is one a cached answer may
+// serve: none, or the site's own.
+func (ec EdgeCache) Shareable(origin string) bool {
+	return origin == "" || (ec.Origin != "" && origin == ec.Origin)
 }
 
 // Cache-Control for a GraphQL response, decided here because this is the one
@@ -68,8 +83,8 @@ func setCacheControl(ec EdgeCache) func(*http.Response) error {
 		if req == nil || req.URL.Path != "/graphql" {
 			return nil
 		}
-		if req.Method != http.MethodGet || authenticated(req) {
-			resp.Header.Set("Cache-Control", CacheControlFor(req.Method, req.URL.Path, authenticated(req), resp.StatusCode, nil, ec))
+		if req.Method != http.MethodGet || authenticated(req) || !ec.Shareable(req.Header.Get("Origin")) {
+			resp.Header.Set("Cache-Control", "private, no-store")
 			return nil
 		}
 		if resp.ContentLength > maxInspectedBody {

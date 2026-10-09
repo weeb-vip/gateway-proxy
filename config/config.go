@@ -27,17 +27,21 @@ type Config struct {
 	// Request headers echoed in Access-Control-Allow-Headers. Left unset it
 	// falls back to defaultCORSAllowedHeaders in the cors middleware, which
 	// keeps the previously hardcoded list plus the W3C trace context headers.
-	CORSAllowedHeaders         []string `env:"CONFIG__CORS_ALLOWED_HEADERS" json:"cors_allowed_headers"`
-	CORSAllowCredentials       bool     `env:"CONFIG__CORS_ALLOW_CREDENTIALS" default:"true" json:"cors_allow_credentials"`
-	CORSMaxAge                 int      `env:"CONFIG__CORS_MAX_AGE" default:"86400" json:"cors_max_age"`
-	AuthMode                   string   `env:"CONFIG__AUTH_MODE" default:"both" json:"auth_mode"` // "cookie", "header", or "both"
-	CacheEnabled               bool     `env:"CONFIG__CACHE_ENABLED" default:"true" json:"cache_enabled"`
-	CacheTTLMinutes            int      `env:"CONFIG__CACHE_TTL_MINUTES" default:"5" json:"cache_ttl_minutes"`
-	RedisURL                   string   `env:"CONFIG__REDIS_URL" default:"redis://localhost:6379" json:"redis_url"`
-	RedisPassword              string   `env:"CONFIG__REDIS_PASSWORD" default:"" json:"redis_password"`
-	RedisDB                    int      `env:"CONFIG__REDIS_DB" default:"0" json:"redis_db"`
-	ProxyURL                   *url.URL
-	APPConfig                  APPConfig
+	CORSAllowedHeaders   []string `env:"CONFIG__CORS_ALLOWED_HEADERS" json:"cors_allowed_headers"`
+	CORSAllowCredentials bool     `env:"CONFIG__CORS_ALLOW_CREDENTIALS" default:"true" json:"cors_allow_credentials"`
+	CORSMaxAge           int      `env:"CONFIG__CORS_MAX_AGE" default:"86400" json:"cors_max_age"`
+	AuthMode             string   `env:"CONFIG__AUTH_MODE" default:"both" json:"auth_mode"` // "cookie", "header", or "both"
+	CacheEnabled         bool     `env:"CONFIG__CACHE_ENABLED" default:"true" json:"cache_enabled"`
+	// How long the CDN may hold an anonymous GET query response (see
+	// internal/handlers/cachecontrol.go): s-maxage and stale-while-revalidate.
+	EdgeCacheTTLSeconds int    `env:"CONFIG__EDGE_CACHE_TTL_SECONDS" default:"300" json:"edge_cache_ttl_seconds"`
+	EdgeCacheSWRSeconds int    `env:"CONFIG__EDGE_CACHE_SWR_SECONDS" default:"600" json:"edge_cache_swr_seconds"`
+	CacheTTLMinutes     int    `env:"CONFIG__CACHE_TTL_MINUTES" default:"5" json:"cache_ttl_minutes"`
+	RedisURL            string `env:"CONFIG__REDIS_URL" default:"redis://localhost:6379" json:"redis_url"`
+	RedisPassword       string `env:"CONFIG__REDIS_PASSWORD" default:"" json:"redis_password"`
+	RedisDB             int    `env:"CONFIG__REDIS_DB" default:"0" json:"redis_db"`
+	ProxyURL            *url.URL
+	APPConfig           APPConfig
 }
 
 func LoadConfig() (*Config, error) {

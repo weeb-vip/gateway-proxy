@@ -11,19 +11,16 @@ import (
 )
 
 func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProxy {
-	return &httputil.ReverseProxy{Director: func(request *http.Request) {
+	edge := EdgeCache{TTLSeconds: config.EdgeCacheTTLSeconds, SWRSeconds: config.EdgeCacheSWRSeconds}
+	return &httputil.ReverseProxy{ModifyResponse: setCacheControl(edge), Director: func(request *http.Request) {
 		request.URL.Scheme = "http"
 		request.URL.Host = config.ProxyURL.Host
 		addUserAgentHeader(request, config)
 		addRemoteIP(request)
 		addJWTData(request, jwtParser, config.AuthMode)
 		addTraceHeaders(request)
-		// log all headers
-		for name, headers := range request.Header {
-			for _, h := range headers {
-				fmt.Printf("Header: %v, Value: %v\n", name, h)
-			}
-		}
+		// No header dump here any more: it wrote every request's cookie and
+		// x-raw-token to stdout, which is the pod log.
 		if config.OverrideOrigin != nil && request.Header.Get("Origin") != *config.OverrideOrigin {
 			request.Header.Set("Origin", *config.OverrideOrigin)
 		}

@@ -98,6 +98,10 @@ func Start(cfg *config.Config, formatter logrus.Formatter) error {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	// robots.txt is answered here, like /healthcheck, so crawlers are told
+	// to stay out without a round trip to the router.
+	mux.HandleFunc("/robots.txt", handlers.Robots)
+
 	// Create cache if enabled
 	var graphqlCache *cache.GraphQLCache
 	if cfg.CacheEnabled {

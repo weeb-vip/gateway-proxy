@@ -12,7 +12,12 @@ import (
 
 func GetProxy(config *config.Config, jwtParser jwt.Parser) *httputil.ReverseProxy {
 	edge := EdgeCache{TTLSeconds: config.EdgeCacheTTLSeconds, SWRSeconds: config.EdgeCacheSWRSeconds, Origin: PrimaryOrigin(config)}
-	return &httputil.ReverseProxy{ModifyResponse: setCacheControl(edge), Director: func(request *http.Request) {
+	cacheControl := setCacheControl(edge)
+	modify := func(resp *http.Response) error {
+		_ = setNoIndex(resp)
+		return cacheControl(resp)
+	}
+	return &httputil.ReverseProxy{ModifyResponse: modify, Director: func(request *http.Request) {
 		request.URL.Scheme = "http"
 		request.URL.Host = config.ProxyURL.Host
 		addUserAgentHeader(request, config)
